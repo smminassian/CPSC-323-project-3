@@ -36,62 +36,62 @@ R29. <Empty> ::= ε
 #include "Lexical_Analyzer.h"
 #include <iostream>
 #include <fstream>
-#include <cctype>
 #include <vector>
 #include <string>
+#include <map>
 using namespace std;
 
-extern Token globalToken; 
+extern Token globalToken;
 int indexPos = 0;
-bool printSwitch = true; 
 
+map<string, int> symbolTable;
+int nextMemory = 10000;
 
-// function prototypes
+int labelCount = 0;
+ofstream outFile;
+
 void Rat25F();
-void OptFunctionDefinitions();
-void FunctionDefinitions();
-void Function();
-void OptParameterList();
-void ParameterList();
-void Parameter();
-void Qualifier();
-void Body();
 void OptDeclarationList();
 void DeclarationList();
 void Declaration();
 void IDs();
 void StatementList();
 void Statement();
-void Compound();
 void Assign();
-void IfStmt();
-void ReturnStmt();
 void PrintStmt();
 void ScanStmt();
 void WhileStmt();
+void IfStmt();
+void ReturnStmt();
 void Condition();
-void Relop();
 void Expression();
 void ExpressionPrime();
 void Term();
 void TermPrime();
 void Factor();
 void Primary();
+void Relop();
 
-
-// helper functions
 string currentLexeme() {
     if (indexPos < (int)globalToken.lexeme.size()) return globalToken.lexeme[indexPos];
-    return ""; 
+    return "";
 }
 
 string currentToken() {
-	if (indexPos < (int)globalToken.token.size()) return globalToken.token[indexPos];
-	return "";
+    if (indexPos < (int)globalToken.token.size()) return globalToken.token[indexPos];
+    return "";
 }
 
 bool atEnd() {
     return indexPos >= (int)globalToken.lexeme.size();
+}
+
+void skipComments() {
+    while (!atEnd() && currentLexeme()[0] == '"') {
+        indexPos++;
+        while (!atEnd() && currentLexeme()[0] != '"') indexPos++;
+        if (!atEnd()) indexPos++;
+    }
 }
 
 void syntaxError(const string &msg) {
@@ -101,312 +101,191 @@ void syntaxError(const string &msg) {
 }
 
 void Match(const string &expected) {
-    if (atEnd()) {
-        syntaxError("Expected '" + expected + "' but found EOF");
-    }
-
-    string cur = currentToken();
+    skipComments();
+    if (atEnd()) syntaxError("Expected '" + expected + "' but found EOF");
     string lex = currentLexeme();
+    if (lex == expected) indexPos++;
+    else syntaxError("Expected '" + expected + "' but found '" + lex + "'");
+}
 
-    if (cur == expected || lex == expected) {
-        if (printSwitch)
-            cout << cur << " " << lex << endl;  
-        indexPos++;
-    } else {
-        syntaxError("Expected '" + expected + "' but found '" + cur + "'");
+void addVariable(const string &id) {
+    if (symbolTable.find(id) == symbolTable.end()) {
+        symbolTable[id] = nextMemory++;
     }
 }
 
+string newLabel() {
+    return "L" + to_string(labelCount++);
+}
 
+void emit(const string &instr) {
+    cout << instr << endl;
+    if (outFile.is_open()) outFile << instr << endl;
+}
 
-// parsing functions
-
-
-// <Rat25F> ::= <Opt Function Definitions> # <Opt Declaration List> <Statement List>
 void Rat25F() {
-    if (printSwitch) cout << "<Rat25F> -> <Opt Function Definitions> # <Opt Declaration List> <Statement List>" << endl;
-    OptFunctionDefinitions();
-    if (currentLexeme() == "#") {
-        Match("#");
-    } else {
-        syntaxError("Missing '#' (expected program divider)");
+    outFile.open("output.txt");
+    if (!outFile) {
+        cerr << "Error opening output.txt" << endl;
+        exit(1);
     }
+
+    while (!atEnd() && currentLexeme() != "#") indexPos++;
+
+    Match("#");
+
     OptDeclarationList();
     StatementList();
 
-    if (!atEnd()) {
-        cerr << "Warning: extra tokens remain after parsing starting at index " << indexPos << endl;
-    } else {
-        cout << "Parsing completed successfully." << endl;
-    }
+    if (currentLexeme() == "#") Match("#");
+
+    cout << "\nSymbol Table:\nIdentifier\tMemory Location\n";
+    for (auto &pair : symbolTable)
+        cout << pair.first << "\t" << pair.second << endl;
+
+    outFile.close();
 }
 
-
-// <Opt Function Definitions> ::= <Function Definitions> | ε
-void OptFunctionDefinitions() {
-    if (currentLexeme() == "function") {
-        if (printSwitch) cout << "<Opt Function Definitions> -> <Function Definitions>" << endl;
-        FunctionDefinitions();
-    } else {
-        if (printSwitch) cout << "<Opt Function Definitions> -> ε" << endl;
-    }
-}
-
-
-// <Function Definitions> ::= <Function> | <Function> <Function Definitions>
-void FunctionDefinitions() {
-    if (printSwitch) cout << "<Function Definitions> -> <Function> <Function Definitions> | <Function>" << endl;
-    Function();
-    while (currentLexeme() == "function") {
-        Function();
-    }
-}
-
-
-// <Function> ::= function <Identifier> ( <Opt Parameter List> ) <Opt Declaration List> <Body>
-void Function() {
-    if (printSwitch) cout << "<Function> -> function <Identifier> ( <Opt Parameter List> ) <Opt Declaration List> <Body>" << endl;
-    Match("function");
-    if (isIdentifierLexeme(currentLexeme())) {
-        Match(currentLexeme()); 
-    } else {
-        syntaxError("Expected function name (identifier)");
-    }
-    Match("(");
-    OptParameterList();
-    Match(")");
-    OptDeclarationList();
-    Body();
-}
-
-
-// parameter rules
-void OptParameterList() {
-    if (isIdentifierLexeme(currentLexeme())) {
-        if (printSwitch) cout << "<Opt Parameter List> -> <Parameter List>" << endl;
-        ParameterList();
-    } else {
-        if (printSwitch) cout << "<Opt Parameter List> -> ε" << endl;
-    }
-}
-
-
-void ParameterList() {
-    if (printSwitch) cout << "<Parameter List> -> <Parameter> ( , <Parameter> )*" << endl;
-    Parameter();
-    while (currentLexeme() == ",") {
-        Match(",");
-        Parameter();
-    }
-}
-
-
-void Parameter() {
-    if (printSwitch) cout << "<Parameter> -> <IDs> <Qualifier>" << endl;
-    IDs();
-    Qualifier();
-}
-
-
-// <Qualifier> ::= integer | boolean | real
-void Qualifier() {
-    if (printSwitch) cout << "<Qualifier> -> integer | boolean | real" << endl;
-    string lex = currentLexeme();
-    if (lex == "integer" || lex == "boolean" || lex == "real") {
-        Match(lex);
-    } else {
-        syntaxError("Expected a type qualifier (integer, boolean, or real)");
-    }
-}
-
-
-// <Body> ::= { <Statement List> }
-void Body() {
-    if (printSwitch) cout << "<Body> -> { <Statement List> }" << endl;
-    Match("{");
-    StatementList();
-    Match("}");
-}
-
-
-// declaration list rules
 void OptDeclarationList() {
-    if (isIdentifierLexeme(currentLexeme()) && 
-        (currentLexeme() == "integer" || currentLexeme() == "boolean" || currentLexeme() == "real")) {
-    }
+    skipComments();
     string lex = currentLexeme();
-    if (lex == "integer" || lex == "boolean" || lex == "real") {
-        if (printSwitch) cout << "<Opt Declaration List> -> <Declaration List>" << endl;
-        DeclarationList();
-    } else {
-        if (printSwitch) cout << "<Opt Declaration List> -> ε" << endl;
-    }
+    if (lex == "integer" || lex == "real" || lex == "boolean") DeclarationList();
 }
 
 void DeclarationList() {
-    if (printSwitch) cout << "<Declaration List> -> <Declaration> ; ( <Declaration> ; )*" << endl;
     Declaration();
     Match(";");
-    while (currentLexeme() == "integer" || currentLexeme() == "boolean" || currentLexeme() == "real") {
+    while (true) {
+        skipComments();
+        string lex = currentLexeme();
+        if (lex != "integer" && lex != "real" && lex != "boolean") break;
         Declaration();
         Match(";");
     }
 }
 
 void Declaration() {
-    if (printSwitch) cout << "<Declaration> -> <Qualifier> <IDs>" << endl;
-    Qualifier();
+    string type = currentLexeme();
+    Match(type);
     IDs();
 }
 
 void IDs() {
-    if (printSwitch) cout << "<IDs> -> <Identifier> ( , <Identifier> )*" << endl;
-    if (isIdentifierLexeme(currentLexeme())) {
-        Match(currentLexeme());
-    } else {
-        syntaxError("Expected identifier in <IDs>");
-    }
+    addVariable(currentLexeme());
+    string id = currentLexeme();
+    Match(id);
     while (currentLexeme() == ",") {
         Match(",");
-        if (isIdentifierLexeme(currentLexeme())) {
-            Match(currentLexeme());
-        } else {
-            syntaxError("Expected identifier after ',' in <IDs>");
-        }
+        addVariable(currentLexeme());
+        Match(currentLexeme());
     }
 }
 
 void StatementList() {
-    if (printSwitch) cout << "<Statement List> -> (<Statement>)*" << endl;
     while (!atEnd()) {
+        skipComments();
         string lex = currentLexeme();
-        if (lex == "{" || isIdentifierLexeme(lex) || lex == "if" || lex == "return" || lex == "put" || lex == "get" || lex == "while") {
-            Statement();
-        } else {
-            break; 
-        }
+        if (lex == "#" || lex == "}") break;
+        Statement();
     }
 }
 
 void Statement() {
+    skipComments();
     string lex = currentLexeme();
-    if (lex == "{") {
-        if (printSwitch) cout << "<Statement> -> <Compound>" << endl;
-        Compound();
-    } else if (isIdentifierLexeme(lex)) {
-        if (printSwitch) cout << "<Statement> -> <Assign>" << endl;
-        Assign();
-    } else if (lex == "if") {
-        if (printSwitch) cout << "<Statement> -> <If>" << endl;
-        IfStmt();
-    } else if (lex == "return") {
-        if (printSwitch) cout << "<Statement> -> <Return>" << endl;
-        ReturnStmt();
-    } else if (lex == "put") {
-        if (printSwitch) cout << "<Statement> -> <Print>" << endl;
-        PrintStmt();
-    } else if (lex == "get") {
-        if (printSwitch) cout << "<Statement> -> <Scan>" << endl;
-        ScanStmt();
-    } else if (lex == "while") {
-        if (printSwitch) cout << "<Statement> -> <While>" << endl;
-        WhileStmt();
-    } else {
-        syntaxError("Unrecognized start of <Statement>");
-    }
-}
-
-void Compound() {
-    if (printSwitch) cout << "<Compound> -> { <Statement List> }" << endl;
-    Match("{");
-    StatementList();
-    Match("}");
+    if (isIdentifierLexeme(lex)) Assign();
+    else if (lex == "put") PrintStmt();
+    else if (lex == "get") ScanStmt();
+    else if (lex == "while") WhileStmt();
+    else if (lex == "if") IfStmt();
+    else if (lex == "return") ReturnStmt();
+    else syntaxError("Unexpected statement");
 }
 
 void Assign() {
-    if (printSwitch) cout << "<Assign> -> <Identifier> = <Expression> ;" << endl;
-    if (!isIdentifierLexeme(currentLexeme())) {
-        syntaxError("Expected identifier at start of assignment");
-    }
-    Match(currentLexeme()); 
-    Match("=");            
+    string id = currentLexeme();
+    int mem = symbolTable[id];
+    Match(id);
+    Match("=");
     Expression();
     Match(";");
-}
-
-void IfStmt() {
-    if (printSwitch) cout << "<If> -> if ( <Condition> ) <Statement> ( else <Statement> )? fi" << endl;
-    Match("if");
-    Match("(");
-    Condition();
-    Match(")");
-    Statement();
-    if (currentLexeme() == "else") {
-        Match("else");
-        Statement();
-    }
-    if (currentLexeme() == "fi") {
-        Match("fi");
-    } else {
-        syntaxError("Expected 'fi' to close if statement");
-    }
-}
-
-void ReturnStmt() {
-    if (printSwitch) cout << "<Return> -> return ( <Expression> | ε ) ;" << endl;
-    Match("return");
-    if (currentLexeme() != ";") {
-        Expression();
-    }
-    Match(";");
+    emit("POPM " + to_string(mem));
 }
 
 void PrintStmt() {
-    if (printSwitch) cout << "<Print> -> put ( <Expression> ) ;" << endl;
     Match("put");
     Match("(");
     Expression();
     Match(")");
     Match(";");
+    emit("STDOUT");
 }
 
 void ScanStmt() {
-    if (printSwitch) cout << "<Scan> -> get ( <IDs> ) ;" << endl;
     Match("get");
     Match("(");
+    string id = currentLexeme();
+    int mem = symbolTable[id];
     IDs();
     Match(")");
     Match(";");
+    emit("STDIN");
+    emit("POPM " + to_string(mem));
 }
 
 void WhileStmt() {
-    if (printSwitch) cout << "<While> -> while ( <Condition> ) <Statement>" << endl;
     Match("while");
     Match("(");
+    string startLabel = newLabel();
+    string endLabel = newLabel();
+    emit("LABEL " + startLabel);
     Condition();
+    emit("JUMPZ " + endLabel);
     Match(")");
     Statement();
+    emit("JUMP " + startLabel);
+    emit("LABEL " + endLabel);
+}
+
+void IfStmt() {
+    Match("if");
+    Match("(");
+    Condition();
+    string elseLabel = newLabel();
+    string endLabel = newLabel();
+    emit("JUMPZ " + elseLabel);
+    Match(")");
+    Statement();
+    if (currentLexeme() == "else") {
+        Match("else");
+        emit("JUMP " + endLabel);
+        emit("LABEL " + elseLabel);
+        Statement();
+        emit("LABEL " + endLabel);
+    } else emit("LABEL " + elseLabel);
+    Match("fi");
+}
+
+void ReturnStmt() {
+    Match("return");
+    if (currentLexeme() != ";") Expression();
+    Match(";");
 }
 
 void Condition() {
-    if (printSwitch) cout << "<Condition> -> <Expression> <Relop> <Expression>" << endl;
     Expression();
+    string op = currentLexeme();
     Relop();
     Expression();
-}
-
-void Relop() {
-    if (printSwitch) cout << "<Relop> -> == | != | > | < | <= | >=" << endl;
-    string lex = currentLexeme();
-    if (isRelopLexeme(lex)) {
-        Match(lex);
-    } else {
-        syntaxError("Expected a relational operator (==, !=, >, <, <=, >=)");
-    }
+    if (op == "==") emit("EQU");
+    else if (op == "!=") emit("NEQ");
+    else if (op == "<") emit("LES");
+    else if (op == ">") emit("GRT");
+    else if (op == "<=") emit("LEQ");
+    else if (op == ">=") emit("GEQ");
 }
 
 void Expression() {
-    if (printSwitch) cout << "<Expression> -> <Term> <ExpressionPrime>" << endl;
     Term();
     ExpressionPrime();
 }
@@ -414,17 +293,15 @@ void Expression() {
 void ExpressionPrime() {
     string lex = currentLexeme();
     if (lex == "+" || lex == "-") {
-        if (printSwitch) cout << "<ExpressionPrime> -> " << lex << " <Term> <ExpressionPrime>" << endl;
         Match(lex);
         Term();
+        if (lex == "+") emit("ADD");
+        else emit("SUB");
         ExpressionPrime();
-    } else {
-        if (printSwitch) cout << "<ExpressionPrime> -> ε" << endl;
     }
 }
 
 void Term() {
-    if (printSwitch) cout << "<Term> -> <Factor> <TermPrime>" << endl;
     Factor();
     TermPrime();
 }
@@ -432,117 +309,72 @@ void Term() {
 void TermPrime() {
     string lex = currentLexeme();
     if (lex == "*" || lex == "/") {
-        if (printSwitch) cout << "<TermPrime> -> " << lex << " <Factor> <TermPrime>" << endl;
         Match(lex);
         Factor();
+        if (lex == "*") emit("MUL");
+        else emit("DIV");
         TermPrime();
-    } else {
-        if (printSwitch) cout << "<TermPrime> -> ε" << endl;
     }
 }
 
 void Factor() {
-    string lex = currentLexeme();
-    if (lex == "-") {
-        if (printSwitch) cout << "<Factor> -> - <Primary>" << endl;
+    if (currentLexeme() == "-") {
         Match("-");
         Primary();
-    } else {
-        if (printSwitch) cout << "<Factor> -> <Primary>" << endl;
-        Primary();
-    }
+        emit("PUSHI -1");
+        emit("MUL");
+    } else Primary();
 }
 
 void Primary() {
     string lex = currentLexeme();
-    if (lex.empty()) syntaxError("Unexpected EOF in <Primary>");
     if (isIdentifierLexeme(lex)) {
-        string idLex = lex;
-        if ((indexPos + 1) < (int)globalToken.lexeme.size() && globalToken.lexeme[indexPos + 1] == "(") {
-            if (printSwitch) cout << "<Primary> -> <Identifier> ( <IDs> )" << endl;
-            Match(idLex); 
-            Match("(");
-            if (isIdentifierLexeme(currentLexeme())) {
-                IDs();
-            } else {
-                syntaxError("Expected identifier(s) inside function call");
-            }
-            Match(")");
-        } else {
-            if (printSwitch) cout << "<Primary> -> <Identifier>" << endl;
-            Match(idLex);
-        }
+        int mem = symbolTable[lex];
+        Match(lex);
+        emit("PUSHM " + to_string(mem));
     } else if (isNumberLexeme(lex)) {
-        if (printSwitch) cout << "<Primary> -> <Integer|Real>" << endl;
+        emit("PUSHI " + lex);
         Match(lex);
     } else if (lex == "(") {
-        if (printSwitch) cout << "<Primary> -> ( <Expression> )" << endl;
         Match("(");
         Expression();
         Match(")");
-    } else if (lex == "true" || lex == "false") {
-        if (printSwitch) cout << "<Primary> -> " << lex << endl;
-        Match(lex);
-    } else {
-        syntaxError("Unexpected token in <Primary>");
-    }
+    } else if (lex == "true") {
+        emit("PUSHI 1");
+        Match("true");
+    } else if (lex == "false") {
+        emit("PUSHI 0");
+        Match("false");
+    } else syntaxError("Unexpected primary");
 }
 
-
+void Relop() {
+    string lex = currentLexeme();
+    if (lex=="==" || lex=="!=" || lex=="<" || lex==">" || lex=="<=" || lex==">=") Match(lex);
+    else syntaxError("Expected relational operator");
+}
 
 int main() {
-    vector<string> testFiles = {"Rat25f.txt", "Rat25f2.txt", "Rat25f3.txt"};
-
-    for (size_t t = 0; t < testFiles.size(); ++t) {
-        string inputFile = testFiles[t];
-        string outputFile = "output" + to_string(t + 1) + ".txt";
-
-        ifstream myFile(inputFile);
-        if (!myFile) {
-            cerr << "Error opening file '" << inputFile << "'." << endl;
-            continue;
-        }
-
-        ofstream outFile(outputFile);
-        if (!outFile) {
-            cerr << "Error creating output file '" << outputFile << "'." << endl;
-            myFile.close();
-            continue;
-        }
-
-        cout << "Processing " << inputFile << "..." << endl;
-        outFile << "Processing " << inputFile << "..." << endl;
-
-        cout << "Starting lexical analysis..." << endl;
-        outFile << "Starting lexical analysis..." << endl;
-
-        globalToken = lexer(myFile);
-
-        cout << "Lexical Analysis Complete. Tokens and Lexemes will be printed:" << endl;
-        outFile << "Lexical Analysis Complete. Tokens and Lexemes will be printed:" << endl;
-
-        for (size_t i = 0; i < globalToken.lexeme.size(); ++i) {
-            string tokenStr = (i < globalToken.token.size() ? globalToken.token[i] : "??");
-            cout << i << ": TokenType: " << tokenStr << "  Lexeme: " << globalToken.lexeme[i] << endl;
-            outFile << i << ": TokenType: " << tokenStr << "  Lexeme: " << globalToken.lexeme[i] << endl;
-        }
-
-        indexPos = 0;
-        cout << "\nStarting Syntax Analysis...\n" << endl;
-        outFile << "\nStarting Syntax Analysis...\n" << endl;
-
-        streambuf* oldCoutBuf = cout.rdbuf();
-        cout.rdbuf(outFile.rdbuf());
-
-        Rat25F();
-
-        cout.rdbuf(oldCoutBuf); 
-
-        myFile.close();
-        outFile.close();
-
-        cout << "Finished processing " << inputFile << ". Output saved to " << outputFile << "\n" << endl;
+    ifstream myFile("Rat25f.txt");
+    if (!myFile) {
+        cerr << "Error opening input file" << endl;
+        return 1;
     }
 
+    globalToken = lexer(myFile);
+    myFile.close();
+
+    Rat25F();
+
+    cout << "\nAssembly code has been written to output.txt and printed above.\n";
     return 0;
 }
+
+
+
+
+
+
+
+
+
