@@ -111,20 +111,18 @@
 //     return lex=="=="||lex=="!="||lex==">"||lex=="<"||lex=="<="||lex==">=";
 // }
 #include <iostream>
-#include "Lexical_Analyzer.h"
-#include <string>
 #include <fstream>
-#include <vector>
 #include <cctype>
+#include <string>
+#include <vector>
+#include "Lexical_Analyzer.h"
 using namespace std;
-
 
 Token globalToken;
 
 Token lexer(ifstream &myFile)
 {
     Token t;
-	int ix = 0;
     string line;
     cout << "Starting lexical analysis..." << endl;
 
@@ -132,116 +130,84 @@ Token lexer(ifstream &myFile)
 
     while (getline(myFile, line))
     {
-		
-        for (char ch : line)
+        int ix = 0;
+
+        while (ix < line.size())
         {
+            char ch = line[ix];
 
-			if (ch == '"'){
-				current_lexeme.clear();
-				ix++;
+            // Skip comments enclosed in ""
+            if (ch == '"')
+            {
+                ix++;
+                while (ix < line.size() && line[ix] != '"') ix++;
+                ix++;
+                continue;
+            }
 
-			
-				while(ix < line.size() && line[ix] != '"'){
-					ix++;
-				}
-				continue;
-			}
-			
+            // Check for separators and operators
             if (checkSeparator(string(1, ch)) != "invalid" || checkOperator(string(1, ch)) != "invalid")
             {
                 if (!current_lexeme.empty())
                 {
                     if (checkKeyword(current_lexeme) != "identifier ")
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back(checkKeyword(current_lexeme));
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
                     else if (isalpha(current_lexeme[0]))
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back(IdentifierFSM(current_lexeme));
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(IdentifierFSM(current_lexeme));
                     else if (isdigit(current_lexeme[0]))
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back(NumberFSM(current_lexeme));
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(NumberFSM(current_lexeme));
                     else
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back("invalid");
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back("invalid");
+
                     current_lexeme.clear();
                 }
 
-                string op(1, ch);
-                if (checkOperator(op) != "invalid")
-                {
-                    t.lexeme.push_back(op);
-                    t.token.push_back(checkOperator(op));
-                }
-                else if (checkSeparator(op) != "invalid")
-                {
-                    t.lexeme.push_back(op);
-                    t.token.push_back(checkSeparator(op));
-                }
+                string s(1, ch);
+                if (checkOperator(s) != "invalid")
+                    t.lexeme.push_back(s), t.token.push_back(checkOperator(s));
+                else if (checkSeparator(s) != "invalid")
+                    t.lexeme.push_back(s), t.token.push_back(checkSeparator(s));
 
-                continue; 
+                ix++;
+                continue;
             }
 
+            // Skip whitespace
             if (isspace(ch))
             {
                 if (!current_lexeme.empty())
                 {
                     if (checkKeyword(current_lexeme) != "identifier ")
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back(checkKeyword(current_lexeme));
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
                     else if (isalpha(current_lexeme[0]))
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back(IdentifierFSM(current_lexeme));
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(IdentifierFSM(current_lexeme));
                     else if (isdigit(current_lexeme[0]))
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back(NumberFSM(current_lexeme));
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(NumberFSM(current_lexeme));
                     else
-                    {
-                        t.lexeme.push_back(current_lexeme);
-                        t.token.push_back("invalid");
-                    }
+                        t.lexeme.push_back(current_lexeme), t.token.push_back("invalid");
+
                     current_lexeme.clear();
                 }
+
+                ix++;
                 continue;
             }
+
             current_lexeme += ch;
+            ix++;
         }
 
         if (!current_lexeme.empty())
         {
             if (checkKeyword(current_lexeme) != "identifier ")
-            {
-                t.lexeme.push_back(current_lexeme);
-                t.token.push_back(checkKeyword(current_lexeme));
-            }
+                t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
             else if (isalpha(current_lexeme[0]))
-            {
-                t.lexeme.push_back(current_lexeme);
-                t.token.push_back(IdentifierFSM(current_lexeme));
-            }
+                t.lexeme.push_back(current_lexeme), t.token.push_back(IdentifierFSM(current_lexeme));
             else if (isdigit(current_lexeme[0]))
-            {
-                t.lexeme.push_back(current_lexeme);
-                t.token.push_back(NumberFSM(current_lexeme));
-            }
+                t.lexeme.push_back(current_lexeme), t.token.push_back(NumberFSM(current_lexeme));
             else
-            {
-                t.lexeme.push_back(current_lexeme);
-                t.token.push_back("invalid");
-            }
+                t.lexeme.push_back(current_lexeme), t.token.push_back("invalid");
+
             current_lexeme.clear();
         }
     }
@@ -249,186 +215,152 @@ Token lexer(ifstream &myFile)
     return t;
 }
 
-const int IdBeginning = 0;
-const int IdValid = 1;
-const int IdInvalid = 2;
+// ---------------------- FSM FUNCTIONS ----------------------
 
 string IdentifierFSM(const string &input)
 {
-	int state = IdBeginning;
+    const int IdBeginning = 0;
+    const int IdValid = 1;
+    const int IdInvalid = 2;
 
-	for (size_t i = 0; i < input.size(); i++)
-	{
-		char ch = input[i];
+    int state = IdBeginning;
 
-		switch (state)
-		{
-		case IdBeginning:
-			if (isalpha(ch) == true)
-			{
-				state = IdValid;
-			}
-			else
-			{
-				state = IdInvalid;
-			}
-			break;
+    for (size_t i = 0; i < input.size(); i++)
+    {
+        char ch = input[i];
 
-		case IdValid:
-			if (isalnum(ch) == true)
-			{
-				state = IdValid;
-			}
-			else
-			{
-				state = IdInvalid;
-			}
-			break;
+        switch (state)
+        {
+        case IdBeginning:
+            if (isalpha(ch))
+                state = IdValid;
+            else
+                state = IdInvalid;
+            break;
 
-		case IdInvalid:
-			break;
-		}
-		if (state == IdInvalid)
-		{
-			break;
-		}
-	}
+        case IdValid:
+            if (isalnum(ch))
+                state = IdValid;
+            else
+                state = IdInvalid;
+            break;
 
-	if (state == IdValid || state == IdInvalid)
-	{
-		return "identifier";
-	}
-	else
-	{
-		return "invalid";
-	}
+        case IdInvalid:
+            break;
+        }
+
+        if (state == IdInvalid)
+            break;
+    }
+
+    if (state == IdValid)
+        return "identifier";
+    else
+        return "invalid";
 }
-
-const int NumBeginning = 0;
-const int NumInt = 1;
-const int NumReal = 2;
-const int NumInvalid = 3;
 
 string NumberFSM(const string &input)
 {
-	int state = NumBeginning;
+    const int NumBeginning = 0;
+    const int NumInt = 1;
+    const int NumReal = 2;
+    const int NumInvalid = 3;
 
-	for (size_t i = 0; i < input.size(); i++)
-	{
-		char ch = input[i];
+    int state = NumBeginning;
 
-		switch (state)
-		{
-		case NumBeginning:
-			if (isdigit(ch) == true)
-			{
-				state = NumInt;
-			}
-			else if (ch == '.')
-			{
-				state = NumReal;
-			}
-			else
-			{
-				state = NumInvalid;
-			}
-			break;
+    for (size_t i = 0; i < input.size(); i++)
+    {
+        char ch = input[i];
 
-		case NumInt:
-			if (isdigit(ch) == true)
-			{
-				state = NumInt;
-			}
-			else if (ch == '.')
-			{
-				state = NumReal;
-			}
-			else
-			{
-				state = NumInvalid;
-			}
-			break;
+        switch (state)
+        {
+        case NumBeginning:
+            if (isdigit(ch))
+                state = NumInt;
+            else if (ch == '.')
+                state = NumReal;
+            else
+                state = NumInvalid;
+            break;
 
-		case NumReal:
-			if (isdigit(ch) == true)
-			{
-				state = NumReal;
-			}
-			else
-			{
-				state = NumInvalid;
-			}
+        case NumInt:
+            if (isdigit(ch))
+                state = NumInt;
+            else if (ch == '.')
+                state = NumReal;
+            else
+                state = NumInvalid;
+            break;
 
-		case NumInvalid:
-			break;
-		}
-		if (state == NumInvalid)
-		{
-			break;
-		}
-	}
+        case NumReal:
+            if (isdigit(ch))
+                state = NumReal;
+            else
+                state = NumInvalid;
+            break;
 
-	if (state == NumInt)
-	{
-		return "integer ";
-	}
-	else if (state == NumReal)
-	{
-		return "real ";
-	}
-	else
-	{
-		return "invalid";
-	}
+        case NumInvalid:
+            break;
+        }
+
+        if (state == NumInvalid)
+            break;
+    }
+
+    if (state == NumInt)
+        return "integer ";
+    else if (state == NumReal)
+        return "real ";
+    else
+        return "invalid";
 }
+
+// ---------------------- CHECK FUNCTIONS ----------------------
 
 string checkKeyword(const string &input)
 {
-	if (input == "if" || input == "else" || input == "fi" || input == "while" || input == "return" || input == "put" || input == "get" || input == "integer" || input == "boolean" || input == "real" || input == "true" || input == "false" || input == "function" || input == "convert" || input == "computeSum")
-	{
-		return "keyword ";
-	}
-	else
-	{
-		return "identifier ";
-	}
+    string keywords[] = {"if","else","fi","while","return","put","get","integer","boolean","real","true","false","function"};
+    for (string k : keywords)
+        if (input == k)
+            return "keyword ";
+    return "identifier ";
 }
 
 string checkOperator(const string &input)
 {
-	if (input == "+" || input == "-" || input == "*" || input == "/" || input == "<=" || input == ">=" || input == "=" || input == "<" || input == ">" || input == "!=")
-	{
-		return "operator ";
-	}
-	else
-	{
-		return "invalid";
-	}
+    string ops[] = {"+","-","*","/","<=",">=","=","<",">","!="};
+    for (string op : ops)
+        if (input == op)
+            return "operator ";
+    return "invalid";
 }
 
 string checkSeparator(const string &input)
 {
-	if (input == ";" || input == "," || input == "(" || input == ")" || input == "{" || input == "}" || input == "[" || input == "]" || input == "#")
-	{
-		return "separator ";
-	}
-	else
-	{
-		return "invalid";
-	}
+    string seps[] = {";",",","(",")","{","}","[","]","#"};
+    for (string s : seps)
+        if (input == s)
+            return "separator ";
+    return "invalid";
 }
 
-bool isIdentifierLexeme(const string &lex) {
+// ---------------------- LEXEME CHECKS ----------------------
+
+bool isIdentifierLexeme(const string &lex)
+{
     return !lex.empty() && isalpha(lex[0]);
 }
 
-bool isNumberLexeme(const string &lex) {
+bool isNumberLexeme(const string &lex)
+{
     return !lex.empty() && isdigit(lex[0]);
 }
 
-bool isRelopLexeme(const string &lex) {
-    return lex=="=="||lex=="!="||lex==">"||lex=="<"||lex=="<="||lex==">=";
+bool isRelopLexeme(const string &lex)
+{
+    return lex=="==" || lex=="!=" || lex==">" || lex=="<" || lex=="<=" || lex==">=";
 }
+
 
 
 // int main()
