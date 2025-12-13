@@ -135,7 +135,6 @@ Token lexer(ifstream &myFile)
         {
             char ch = line[ix];
 
-            // Skip comments enclosed in ""
             if (ch == '"')
             {
                 ix++;
@@ -144,12 +143,10 @@ Token lexer(ifstream &myFile)
                 continue;
             }
 
-            // Skip whitespace
             if (isspace(ch))
             {
                 if (!current_lexeme.empty())
                 {
-                    // Process accumulated lexeme
                     if (checkKeyword(current_lexeme) != "identifier ")
                         t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
                     else if (isalpha(current_lexeme[0]))
@@ -165,7 +162,6 @@ Token lexer(ifstream &myFile)
                 continue;
             }
 
-            // Check for operators (including multi-char operators)
             string twoChar = (ix + 1 < line.size()) ? string() + ch + line[ix + 1] : "";
             if (checkOperator(twoChar) != "invalid")
             {
@@ -212,12 +208,10 @@ Token lexer(ifstream &myFile)
                 continue;
             }
 
-            // Otherwise, add char to current lexeme
             current_lexeme += ch;
             ix++;
         }
 
-        // Process any remaining lexeme at the end of the line
         if (!current_lexeme.empty())
         {
             if (checkKeyword(current_lexeme) != "identifier ")
@@ -237,7 +231,6 @@ Token lexer(ifstream &myFile)
 }
 
 
-// ---------------------- FSM FUNCTIONS ----------------------
 
 string IdentifierFSM(const string &input)
 {
@@ -337,7 +330,6 @@ string NumberFSM(const string &input)
         return "invalid";
 }
 
-// ---------------------- CHECK FUNCTIONS ----------------------
 
 string checkKeyword(const string &input)
 {
@@ -366,7 +358,6 @@ string checkSeparator(const string &input)
     return "invalid";
 }
 
-// ---------------------- LEXEME CHECKS ----------------------
 
 bool isIdentifierLexeme(const string &lex)
 {

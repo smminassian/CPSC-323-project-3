@@ -415,7 +415,7 @@ extern Token globalToken;
 int indexPos = 0;
 bool printSwitch = false;
 
-/* ================= SYMBOL TABLE ================= */
+
 
 struct Symbol {
     int memory;
@@ -426,7 +426,7 @@ vector<string> symbolNames;
 vector<Symbol> symbolTable;
 int Memory_address = 10000;
 
-/* ================= ASSEMBLY ================= */
+
 
 vector<string> assembly;
 int instrAddress = 1;
@@ -435,7 +435,7 @@ void emit(const string &instr) {
     assembly.push_back(to_string(instrAddress++) + " " + instr);
 }
 
-/* ================= HELPERS ================= */
+
 
 string currentLexeme() {
     if (indexPos < (int)globalToken.lexeme.size())
@@ -475,7 +475,7 @@ void Match(const string &expected) {
     }
 }
 
-/* ================= SYMBOL TABLE OPS ================= */
+
 
 int findSymbol(const string &id) {
     for (int i = 0; i < (int)symbolNames.size(); i++)
@@ -505,7 +505,7 @@ Symbol getSymbol(const string &id) {
     return symbolTable[idx];
 }
 
-/* ================= GRAMMAR PROTOTYPES ================= */
+
 
 void Rat25F();
 void OptDeclarationList();
@@ -529,7 +529,7 @@ void Factor();
 void Primary();
 void Relop();
 
-/* ================= PARSER ================= */
+
 
 void Rat25F() {
     if (printSwitch)
@@ -677,16 +677,13 @@ void IfStmt() {
     Condition();
     Match(")");
 
-    // Parse the "then" statement or block
     Statement();
 
-    // Optional "else" block
     if (currentLexeme() == "else") {
         Match("else");
         Statement();
     }
 
-    // No "fi" needed
 }
 
 
@@ -779,19 +776,50 @@ void Primary() {
     else syntaxError("Invalid primary");
 }
 
-/* ================= MAIN ================= */
+
 
 int main() {
-    ifstream myFile("Rat25f3.txt");
-    if (!myFile) {
-        cerr << "Error opening input file" << endl;
+    vector<string> inputFiles = { "Rat25f1.txt", "Rat25f2.txt", "Rat25f3.txt" };
+    vector<string> outputFiles = { "output1.txt", "output2.txt", "output3.txt" };
+
+    if (inputFiles.size() != outputFiles.size()) {
+        cerr << "Error: Input and output file lists do not match in size." << endl;
         return 1;
     }
 
-    globalToken = lexer(myFile);
-    myFile.close();
+    for (size_t i = 0; i < inputFiles.size(); i++) {
+        ifstream myFile(inputFiles[i]);
+        if (!myFile) {
+            cerr << "Error opening input file: " << inputFiles[i] << endl;
+            continue;
+        }
 
-    Rat25F();
+        indexPos = 0;
+        symbolNames.clear();
+        symbolTable.clear();
+        Memory_address = 10000;
+        assembly.clear();
+        instrAddress = 1;
+
+        globalToken = lexer(myFile);
+        myFile.close();
+
+        Rat25F();
+
+        ofstream outFile(outputFiles[i]);
+        if (!outFile) {
+            cerr << "Error opening output file: " << outputFiles[i] << endl;
+            continue;
+        }
+
+        for (const string &s : assembly)
+            outFile << s << endl;
+
+        outFile.close();
+
+        cout << "Processed " << inputFiles[i] << " -> " << outputFiles[i] << endl;
+    }
+
     return 0;
 }
 
