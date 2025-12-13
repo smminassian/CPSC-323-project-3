@@ -417,6 +417,35 @@ SymbolTable symtab;   // [A3 CHANGE] Global symbol table for Assignment 3
 int indexPos = 0;
 bool printSwitch = true; // toggle verbose printing
 
+// [A3 CODEGEN] Assembly instruction list (1-based indexing)
+vector<string> instructions;
+int instructionIndex = 1;
+
+// [A3 CODEGEN] emit helpers
+int emitInstruction(const string& instr) {
+    instructions.push_back(to_string(instructionIndex) + " " + instr);
+    return instructionIndex++;
+}
+
+// [A3 CODEGEN] patch operand of a previously emitted instruction (for JUMP/JUMPZ)
+void patchInstructionOperand(int instrNumber1Based, int target) {
+    if (instrNumber1Based < 1 || instrNumber1Based > (int)instructions.size()) return;
+    string& line = instructions[instrNumber1Based - 1];
+
+    // Keep everything up to first space after the line number and mnemonic.
+    // Example: "11 JUMPZ 0" -> replace last operand with target
+    // We'll replace everything after the last space with target.
+    size_t lastSpace = line.find_last_of(' ');
+    if (lastSpace == string::npos) return;
+    line = line.substr(0, lastSpace + 1) + to_string(target);
+}
+
+// [A3 CODEGEN] print assembly listing
+void printInstructions() {
+    cout << "\nAssembly Code Listing\n";
+    for (const auto& s : instructions) cout << s << "\n";
+}
+
 // Function prototypes
 void Rat25F();
 string Qualifier();          // [A3 CHANGE] now returns declared type
@@ -426,7 +455,7 @@ void DeclarationList();
 void Declaration();
 
 // [A3 CHANGE] Split IDs into declaration vs usage
-void IDsDecl(const string& type); 
+void IDsDecl(const string& type);
 void IDsUse();
 
 void StatementList();
@@ -437,13 +466,13 @@ void PrintStmt();
 void ScanStmt();
 void WhileStmt();
 void Condition();
-void Relop();
 void Expression();
 void ExpressionPrime();
 void Term();
 void TermPrime();
 void Factor();
 void Primary();
+string Relop();
 
 
 // Helper functions
@@ -496,6 +525,7 @@ void Rat25F() {
         cout << "Parsing completed successfully." << endl;
 
     symtab.print();   // [A3 CHANGE] required symbol table listing
+    printInstructions(); // [A3 CODEGEN] required assembly listing
 }
 
 // <Qualifier> ::= integer | boolean | real
@@ -640,11 +670,15 @@ void Compound() {
 // <Assign> ::= <Identifier> = <Expression> ;
 void Assign() {
     string lhs = currentLexeme();
-    symtab.lookup(lhs);    // [A3 CHANGE] use-before-declare check
+    auto sym = symtab.lookup(lhs);    // [A3 CHANGE] use-before-declare check
     Match(lhs);
 
     Match("=");
     Expression();
+
+    // [A3 CODEGEN] store expression result into variable memory
+    emitInstruction("POPM " + to_string(sym.memory));
+
     Match(";");
 }
 
@@ -654,6 +688,10 @@ void PrintStmt() {
     Match("(");
     Expression();
     Match(")");
+
+    // [A3 CODEGEN] output top-of-stack
+    emitInstruction("STDOUT");
+
     Match(";");
 }
 
@@ -661,32 +699,88 @@ void PrintStmt() {
 void ScanStmt() {
     Match("get");
     Match("(");
-    IDsUse();              // [A3 CHANGE]
+
+    // [A3 CODEGEN] For Assignment 3 sample, get takes a single identifier.
+    // We'll support multiple IDs by reading multiple inputs.
+    if (printSwitch)
+        cout << "<IDs> -> <Identifier> (, <Identifier>)*" << endl;
+
+    // First id
+    string name = currentLexeme();
+    if (IdentifierFSM(name) != "identifier" || checkKeyword(name) == "keyword ")
+        syntaxError("Expected identifier");
+    auto sym = symtab.lookup(name);
+    Match(name);
+
+    emitInstruction("STDIN");
+    emitInstruction("POPM " + to_string(sym.memory));
+
+    // Additional ids: read more STDIN values
+    while (currentLexeme() == ",") {
+        Match(",");
+        name = currentLexeme();
+        if (IdentifierFSM(name) != "identifier" || checkKeyword(name) == "keyword ")
+            syntaxError("Expected identifier after ','");
+        sym = symtab.lookup(name);
+        Match(name);
+
+        emitInstruction("STDIN");
+        emitInstruction("POPM " + to_string(sym.memory));
+    }
+
     Match(")");
     Match(";");
 }
 
 // <While> ::= while ( <Condition> ) <Statement>
 void WhileStmt() {
+    // [A3 CODEGEN] while loop structure with backpatching
+    int loopStart = emitInstruction("LABEL");  // label at top of loop
+
     Match("while");
     Match("(");
     Condition();
     Match(")");
+
+    // If condition result is 0 -> jump out (patch later)
+    int jzLine = emitInstruction("JUMPZ 0");
+
     Statement();
+
+    // jump back to start label instruction location
+    emitInstruction("JUMP " + to_string(loopStart));
+
+    // patch JUMPZ target to instruction AFTER the loop
+    patchInstructionOperand(jzLine, instructionIndex);
 }
 
 // <Condition> ::= <Expression> <Relop> <Expression>
 void Condition() {
     Expression();
-    Relop();
+    string op = Relop();
     Expression();
+
+    // [A3 CODEGEN] emit compare AFTER both expressions are on stack
+    if (op == "==") emitInstruction("EQU");
+    else if (op == "!=") emitInstruction("NEQ");
+    else if (op == ">") emitInstruction("GRT");
+    else if (op == "<") emitInstruction("LES");
+    else if (op == "<=") emitInstruction("LEQ");
+    else if (op == ">=") emitInstruction("GEQ");
 }
 
+
 // <Relop> ::= == | != | > | < | <= | >=
-void Relop() {
-    if (isRelopLexeme(currentLexeme())) Match(currentLexeme());
-    else syntaxError("Expected relational operator");
+string Relop() {
+    string op = currentLexeme();
+    if (isRelopLexeme(op)) {
+        Match(op);
+        return op;
+    }
+    syntaxError("Expected relational operator");
+    return "";
 }
+
 
 // <Expression> ::= <Term> <ExpressionPrime>
 void Expression() {
@@ -700,6 +794,11 @@ void ExpressionPrime() {
     if (lex == "+" || lex == "-") {
         Match(lex);
         Term();
+
+        // [A3 CODEGEN] emit arithmetic op after rhs is evaluated
+        if (lex == "+") emitInstruction("ADD");
+        else emitInstruction("SUB");
+
         ExpressionPrime();
     }
 }
@@ -716,6 +815,11 @@ void TermPrime() {
     if (lex == "*" || lex == "/") {
         Match(lex);
         Factor();
+
+        // [A3 CODEGEN] emit arithmetic op after rhs is evaluated
+        if (lex == "*") emitInstruction("MUL");
+        else emitInstruction("DIV");
+
         TermPrime();
     }
 }
@@ -725,7 +829,13 @@ void Factor() {
     if (currentLexeme() == "-") {
         Match("-");
         Primary();
-    } else Primary();
+
+        // [A3 CODEGEN] unary minus: multiply by -1
+        emitInstruction("PUSHI -1");
+        emitInstruction("MUL");
+    } else {
+        Primary();
+    }
 }
 
 // <Primary> ::= <Identifier> | <Integer> | (<Expression>) | true | false
@@ -733,11 +843,23 @@ void Primary() {
     string lex = currentLexeme();
 
     if (IdentifierFSM(lex) == "identifier") {
-        symtab.lookup(lex);    // [A3 CHANGE]
+        auto sym = symtab.lookup(lex);    // [A3 CHANGE]
         Match(lex);
+
+        // [A3 CODEGEN] push variable value from memory location
+        emitInstruction("PUSHM " + to_string(sym.memory));
     }
     else if (isNumberLexeme(lex) || lex == "true" || lex == "false") {
-        Match(lex);
+        if (lex == "true") {
+            Match("true");
+            emitInstruction("PUSHI 1");
+        } else if (lex == "false") {
+            Match("false");
+            emitInstruction("PUSHI 0");
+        } else {
+            Match(lex);
+            emitInstruction("PUSHI " + lex);
+        }
     }
     else if (lex == "(") {
         Match("(");
@@ -763,4 +885,3 @@ int main(int argc, char** argv) {
     Rat25F();
     return 0;
 }
-

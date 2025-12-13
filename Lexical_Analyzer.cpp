@@ -328,7 +328,7 @@ string checkKeyword(const string &input)
 
 string checkOperator(const string &input)
 {
-    string ops[] = {"+","-","*","/","<=",">=","=","<",">","!="};
+    string ops[] = {"+","-","*","/","==","<=",">=","=","<",">","!="};
     for (string op : ops)
         if (input == op)
             return "operator ";
