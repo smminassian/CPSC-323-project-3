@@ -124,7 +124,6 @@ Token lexer(ifstream &myFile)
 {
     Token t;
     string line;
-    cout << "Starting lexical analysis..." << endl;
 
     string current_lexeme = "";
 
@@ -145,38 +144,12 @@ Token lexer(ifstream &myFile)
                 continue;
             }
 
-            // Check for separators and operators
-            if (checkSeparator(string(1, ch)) != "invalid" || checkOperator(string(1, ch)) != "invalid")
-            {
-                if (!current_lexeme.empty())
-                {
-                    if (checkKeyword(current_lexeme) != "identifier ")
-                        t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
-                    else if (isalpha(current_lexeme[0]))
-                        t.lexeme.push_back(current_lexeme), t.token.push_back(IdentifierFSM(current_lexeme));
-                    else if (isdigit(current_lexeme[0]))
-                        t.lexeme.push_back(current_lexeme), t.token.push_back(NumberFSM(current_lexeme));
-                    else
-                        t.lexeme.push_back(current_lexeme), t.token.push_back("invalid");
-
-                    current_lexeme.clear();
-                }
-
-                string s(1, ch);
-                if (checkOperator(s) != "invalid")
-                    t.lexeme.push_back(s), t.token.push_back(checkOperator(s));
-                else if (checkSeparator(s) != "invalid")
-                    t.lexeme.push_back(s), t.token.push_back(checkSeparator(s));
-
-                ix++;
-                continue;
-            }
-
             // Skip whitespace
             if (isspace(ch))
             {
                 if (!current_lexeme.empty())
                 {
+                    // Process accumulated lexeme
                     if (checkKeyword(current_lexeme) != "identifier ")
                         t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
                     else if (isalpha(current_lexeme[0]))
@@ -188,15 +161,63 @@ Token lexer(ifstream &myFile)
 
                     current_lexeme.clear();
                 }
-
                 ix++;
                 continue;
             }
 
+            // Check for operators (including multi-char operators)
+            string twoChar = (ix + 1 < line.size()) ? string() + ch + line[ix + 1] : "";
+            if (checkOperator(twoChar) != "invalid")
+            {
+                if (!current_lexeme.empty())
+                {
+                    if (checkKeyword(current_lexeme) != "identifier ")
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
+                    else if (isalpha(current_lexeme[0]))
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(IdentifierFSM(current_lexeme));
+                    else if (isdigit(current_lexeme[0]))
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(NumberFSM(current_lexeme));
+                    else
+                        t.lexeme.push_back(current_lexeme), t.token.push_back("invalid");
+                    current_lexeme.clear();
+                }
+
+                t.lexeme.push_back(twoChar);
+                t.token.push_back(checkOperator(twoChar));
+                ix += 2;
+                continue;
+            }
+
+            string oneChar(1, ch);
+            if (checkOperator(oneChar) != "invalid" || checkSeparator(oneChar) != "invalid")
+            {
+                if (!current_lexeme.empty())
+                {
+                    if (checkKeyword(current_lexeme) != "identifier ")
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(checkKeyword(current_lexeme));
+                    else if (isalpha(current_lexeme[0]))
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(IdentifierFSM(current_lexeme));
+                    else if (isdigit(current_lexeme[0]))
+                        t.lexeme.push_back(current_lexeme), t.token.push_back(NumberFSM(current_lexeme));
+                    else
+                        t.lexeme.push_back(current_lexeme), t.token.push_back("invalid");
+                    current_lexeme.clear();
+                }
+
+                if (checkOperator(oneChar) != "invalid")
+                    t.lexeme.push_back(oneChar), t.token.push_back(checkOperator(oneChar));
+                else
+                    t.lexeme.push_back(oneChar), t.token.push_back(checkSeparator(oneChar));
+                ix++;
+                continue;
+            }
+
+            // Otherwise, add char to current lexeme
             current_lexeme += ch;
             ix++;
         }
 
+        // Process any remaining lexeme at the end of the line
         if (!current_lexeme.empty())
         {
             if (checkKeyword(current_lexeme) != "identifier ")
@@ -214,6 +235,7 @@ Token lexer(ifstream &myFile)
 
     return t;
 }
+
 
 // ---------------------- FSM FUNCTIONS ----------------------
 
@@ -328,7 +350,7 @@ string checkKeyword(const string &input)
 
 string checkOperator(const string &input)
 {
-    string ops[] = {"+","-","*","/","<=",">=","=","<",">","!="};
+    string ops[] = { "==", "!=", "<=", ">=", "+", "-", "*", "/", "=", "<", ">" };
     for (string op : ops)
         if (input == op)
             return "operator ";

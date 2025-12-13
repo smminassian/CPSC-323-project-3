@@ -413,7 +413,7 @@ using namespace std;
 
 extern Token globalToken;
 int indexPos = 0;
-bool printSwitch = true;
+bool printSwitch = false;
 
 /* ================= SYMBOL TABLE ================= */
 
@@ -519,6 +519,7 @@ void Assign();
 void PrintStmt();
 void ScanStmt();
 void WhileStmt();
+void IfStmt();
 void Condition();
 void Expression();
 void ExpressionPrime();
@@ -606,6 +607,8 @@ void Statement() {
         PrintStmt();
     else if (lex == "while")
         WhileStmt();
+    else if (lex == "if")          
+        IfStmt();
     else if (lex == "{")
         CompoundStmt();
     else if (isIdentifierLexeme(lex))
@@ -668,10 +671,29 @@ void WhileStmt() {
     assembly[jumpz - 1] = to_string(jumpz) + " JUMPZ " + to_string(instrAddress);
 }
 
+void IfStmt() {
+    Match("if");
+    Match("(");
+    Condition();
+    Match(")");
+
+    // Parse the "then" statement or block
+    Statement();
+
+    // Optional "else" block
+    if (currentLexeme() == "else") {
+        Match("else");
+        Statement();
+    }
+
+    // No "fi" needed
+}
+
+
 void Condition() {
     Expression();
-    string op = currentLexeme();
-    Relop();
+    string op = currentLexeme(); 
+    Relop();                      
     Expression();
 
     if (op == "<") emit("LES");
@@ -681,6 +703,7 @@ void Condition() {
     else if (op == "<=") emit("LEQ");
     else if (op == ">=") emit("GEQ");
 }
+
 
 void Relop() {
     if (isRelopLexeme(currentLexeme()))
