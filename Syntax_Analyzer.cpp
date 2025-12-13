@@ -411,44 +411,35 @@ R29. <Empty> ::= ε
 #include <string>
 using namespace std;
 
+extern Token globalToken;
 int indexPos = 0;
-bool printSwitch = true; // toggle verbose printing
+bool printSwitch = true;
 
-// Function prototypes
-void Rat25F();
-void OptFunctionDefinitions();
-void FunctionDefinitions();
-void Function();
-void OptParameterList();
-void ParameterList();
-void Parameter();
-void Qualifier();
-void Body();
-void OptDeclarationList();
-void DeclarationList();
-void Declaration();
-void IDs();
-void StatementList();
-void Statement();
-void Compound();
-void Assign();
-void IfStmt();
-void ReturnStmt();
-void PrintStmt();
-void ScanStmt();
-void WhileStmt();
-void Condition();
-void Relop();
-void Expression();
-void ExpressionPrime();
-void Term();
-void TermPrime();
-void Factor();
-void Primary();
+/* ================= SYMBOL TABLE ================= */
 
-// Helper functions
+struct Symbol {
+    int memory;
+    string type;
+};
+
+vector<string> symbolNames;
+vector<Symbol> symbolTable;
+int Memory_address = 10000;
+
+/* ================= ASSEMBLY ================= */
+
+vector<string> assembly;
+int instrAddress = 1;
+
+void emit(const string &instr) {
+    assembly.push_back(to_string(instrAddress++) + " " + instr);
+}
+
+/* ================= HELPERS ================= */
+
 string currentLexeme() {
-    if (indexPos < (int)globalToken.lexeme.size()) return globalToken.lexeme[indexPos];
+    if (indexPos < (int)globalToken.lexeme.size())
+        return globalToken.lexeme[indexPos];
     return "";
 }
 
@@ -456,313 +447,317 @@ bool atEnd() {
     return indexPos >= (int)globalToken.lexeme.size();
 }
 
-// Skip comment lexemes ("comment")
 void SkipComments() {
-    while (!atEnd() && currentLexeme()[0] == '"') {
-        if (printSwitch) cout << "Skipping comment: " << currentLexeme() << endl;
+    while (!atEnd() && currentLexeme()[0] == '"')
         indexPos++;
-    }
 }
 
-// Syntax error
 void syntaxError(const string &msg) {
     string lex = atEnd() ? "EOF" : currentLexeme();
-    cerr << "Syntax Error: " << msg << " at token '" << lex << "' (index " << indexPos << ")" << endl;
+    cerr << "Syntax Error: " << msg
+         << " at token '" << lex
+         << "' (index " << indexPos << ")" << endl;
     exit(1);
 }
 
-// Match a specific lexeme
 void Match(const string &expected) {
     SkipComments();
-    if (atEnd()) syntaxError("Expected '" + expected + "' but found EOF");
-    string cur = currentLexeme();
-    if (cur == expected) {
-        if (printSwitch) cout << "Token: " << cur << "   (matched '" << expected << "')" << endl;
+    if (atEnd())
+        syntaxError("Expected '" + expected + "' but found EOF");
+
+    if (currentLexeme() == expected) {
+        if (printSwitch)
+            cout << "Token: " << expected << "   (matched '" << expected << "')" << endl;
         indexPos++;
         SkipComments();
-    } else syntaxError("Expected '" + expected + "' but found '" + cur + "'");
-}
-
-// ===== Grammar Rules =====
-
-// <Rat25F> ::= <Opt Function Definitions> # <Opt Declaration List> <Statement List> #
-void Rat25F() {
-    if (printSwitch) cout << "<Rat25F> -> <Opt Function Definitions> # <Opt Declaration List> <Statement List> #" << endl;
-
-    OptFunctionDefinitions();
-    Match("#");
-    OptDeclarationList();
-    StatementList();
-    Match("#");
-
-    if (!atEnd()) {
-        cerr << "Warning: extra tokens remain starting at index " << indexPos << endl;
     } else {
-        cout << "Parsing completed successfully." << endl;
+        syntaxError("Expected '" + expected + "' but found '" + currentLexeme() + "'");
     }
 }
 
-// <Opt Function Definitions> ::= <Function Definitions> | ε
-void OptFunctionDefinitions() {
-    if (currentLexeme() == "function") {
-        if (printSwitch) cout << "<Opt Function Definitions> -> <Function Definitions>" << endl;
-        FunctionDefinitions();
-    } else if (printSwitch) cout << "<Opt Function Definitions> -> ε" << endl;
+/* ================= SYMBOL TABLE OPS ================= */
+
+int findSymbol(const string &id) {
+    for (int i = 0; i < (int)symbolNames.size(); i++)
+        if (symbolNames[i] == id)
+            return i;
+    return -1;
 }
 
-// <Function Definitions> ::= <Function> (<Function Definitions>)*
-void FunctionDefinitions() {
-    if (printSwitch) cout << "<Function Definitions> -> <Function> (<Function Definitions>)*" << endl;
-    Function();
-    while (currentLexeme() == "function") Function();
+void insertSymbol(const string &id, const string &type) {
+    if (findSymbol(id) != -1) {
+        cerr << "Semantic Error: redeclaration of '" << id << "'" << endl;
+        exit(1);
+    }
+    Symbol s;
+    s.memory = Memory_address++;
+    s.type = type;
+    symbolNames.push_back(id);
+    symbolTable.push_back(s);
 }
 
-// <Function> ::= function <Identifier> ( <Opt Parameter List> ) <Opt Declaration List> <Body>
-void Function() {
-    if (printSwitch) cout << "<Function> -> function <Identifier> ( <Opt Parameter List> ) <Opt Declaration List> <Body>" << endl;
-    Match("function");
-    if (isIdentifierLexeme(currentLexeme())) Match(currentLexeme());
-    else syntaxError("Expected function name (identifier)");
-    Match("(");
-    OptParameterList();
-    Match(")");
+Symbol getSymbol(const string &id) {
+    int idx = findSymbol(id);
+    if (idx == -1) {
+        cerr << "Semantic Error: '" << id << "' used before declaration" << endl;
+        exit(1);
+    }
+    return symbolTable[idx];
+}
+
+/* ================= GRAMMAR PROTOTYPES ================= */
+
+void Rat25F();
+void OptDeclarationList();
+void DeclarationList();
+void Declaration();
+void IDs();
+void StatementList();
+void Statement();
+void CompoundStmt();
+void Assign();
+void PrintStmt();
+void ScanStmt();
+void WhileStmt();
+void Condition();
+void Expression();
+void ExpressionPrime();
+void Term();
+void TermPrime();
+void Factor();
+void Primary();
+void Relop();
+
+/* ================= PARSER ================= */
+
+void Rat25F() {
+    if (printSwitch)
+        cout << "<Rat25F> -> # <Opt Declaration List> <Statement List> #" << endl;
+
+    Match("#");
     OptDeclarationList();
-    Body();
-}
-
-// <Opt Parameter List> ::= <Parameter List> | ε
-void OptParameterList() {
-    if (isIdentifierLexeme(currentLexeme())) {
-        if (printSwitch) cout << "<Opt Parameter List> -> <Parameter List>" << endl;
-        ParameterList();
-    } else if (printSwitch) cout << "<Opt Parameter List> -> ε" << endl;
-}
-
-// <Parameter List> ::= <Parameter> (, <Parameter>)*
-void ParameterList() {
-    if (printSwitch) cout << "<Parameter List> -> <Parameter> (, <Parameter>)*" << endl;
-    Parameter();
-    while (currentLexeme() == ",") {
-        Match(",");
-        Parameter();
-    }
-}
-
-// <Parameter> ::= <IDs> <Qualifier>
-void Parameter() {
-    if (printSwitch) cout << "<Parameter> -> <IDs> <Qualifier>" << endl;
-    IDs();
-    Qualifier();
-}
-
-// <Qualifier> ::= integer | boolean | real
-void Qualifier() {
-    if (printSwitch) cout << "<Qualifier> -> integer | boolean | real" << endl;
-    string lex = currentLexeme();
-    if (lex == "integer" || lex == "boolean" || lex == "real") Match(lex);
-    else syntaxError("Expected type qualifier (integer, boolean, or real)");
-}
-
-// <Body> ::= { <Statement List> }
-void Body() {
-    if (printSwitch) cout << "<Body> -> { <Statement List> }" << endl;
-    Match("{");
     StatementList();
-    Match("}");
+    Match("#");
+
+    cout << "\nAssembly Code\n";
+    for (string s : assembly)
+        cout << s << endl;
+
+    cout << "\nSymbol Table\n";
+    cout << "Identifier\tMemory\tType\n";
+    for (int i = 0; i < (int)symbolNames.size(); i++)
+        cout << symbolNames[i] << "\t\t"
+             << symbolTable[i].memory << "\t"
+             << symbolTable[i].type << endl;
 }
 
-// <Opt Declaration List> ::= <Declaration List> | ε
 void OptDeclarationList() {
-    string lex = currentLexeme();
-    if (lex == "integer" || lex == "boolean" || lex == "real") {
-        if (printSwitch) cout << "<Opt Declaration List> -> <Declaration List>" << endl;
+    if (currentLexeme() == "integer" || currentLexeme() == "boolean")
         DeclarationList();
-    } else if (printSwitch) cout << "<Opt Declaration List> -> ε" << endl;
 }
 
-// <Declaration List> ::= <Declaration> ; (<Declaration> ;)*
+string currentType;
+
 void DeclarationList() {
-    if (printSwitch) cout << "<Declaration List> -> <Declaration> ; (<Declaration> ;)*" << endl;
     Declaration();
     Match(";");
-    while (currentLexeme() == "integer" || currentLexeme() == "boolean" || currentLexeme() == "real") {
+    while (currentLexeme() == "integer" || currentLexeme() == "boolean") {
         Declaration();
         Match(";");
     }
 }
 
-// <Declaration> ::= <Qualifier> <IDs>
 void Declaration() {
-    if (printSwitch) cout << "<Declaration> -> <Qualifier> <IDs>" << endl;
-    Qualifier();
+    currentType = currentLexeme();
+    if (currentType != "integer" && currentType != "boolean")
+        syntaxError("Invalid type (real not allowed)");
+    Match(currentType);
     IDs();
 }
 
-// <IDs> ::= <Identifier> (, <Identifier>)*
 void IDs() {
-    if (printSwitch) cout << "<IDs> -> <Identifier> (, <Identifier>)*" << endl;
-    if (isIdentifierLexeme(currentLexeme())) Match(currentLexeme());
-    else syntaxError("Expected identifier in <IDs>");
+    string id = currentLexeme();
+    insertSymbol(id, currentType);
+    Match(id);
+
     while (currentLexeme() == ",") {
         Match(",");
-        if (isIdentifierLexeme(currentLexeme())) Match(currentLexeme());
-        else syntaxError("Expected identifier after ',' in <IDs>");
+        id = currentLexeme();
+        insertSymbol(id, currentType);
+        Match(id);
     }
 }
 
-// <Statement List> ::= (<Statement>)*
 void StatementList() {
-    if (printSwitch) cout << "<Statement List> -> (<Statement>)*" << endl;
     while (!atEnd()) {
         string lex = currentLexeme();
-        if (lex == "{" || isIdentifierLexeme(lex) || lex == "if" || lex == "return" || lex == "put" || lex == "get" || lex == "while") {
-            Statement();
-        } else break;
+        if (lex == "#" || lex == "}")
+            break;
+        Statement();
     }
 }
 
-// <Statement> ::= <Compound> | <Assign> | <If> | <Return> | <Print> | <Scan> | <While>
 void Statement() {
     string lex = currentLexeme();
-    if (lex == "{") Compound();
-    else if (lex == "if") IfStmt();
-    else if (lex == "return") ReturnStmt();
-    else if (lex == "put") PrintStmt();
-    else if (lex == "get") ScanStmt();      
-    else if (lex == "while") WhileStmt();
-    else if (isIdentifierLexeme(lex)) Assign();
-    else syntaxError("Unrecognized start of <Statement>");
+
+    if (lex == "get")
+        ScanStmt();
+    else if (lex == "put")
+        PrintStmt();
+    else if (lex == "while")
+        WhileStmt();
+    else if (lex == "{")
+        CompoundStmt();
+    else if (isIdentifierLexeme(lex))
+        Assign();
+    else
+        syntaxError("Invalid statement");
 }
 
-// <Compound> ::= { <Statement List> }
-void Compound() {
+
+void CompoundStmt() {
     Match("{");
     StatementList();
     Match("}");
 }
 
-// <Assign> ::= <Identifier> = <Expression> ;
+
+
 void Assign() {
-    Match(currentLexeme());
+    string id = currentLexeme();
+    Symbol s = getSymbol(id);
+    Match(id);
     Match("=");
     Expression();
     Match(";");
+    emit("POPM " + to_string(s.memory));
 }
 
-// <If> ::= if ( <Condition> ) <Statement> ( else <Statement> )? fi
-void IfStmt() {
-    Match("if");
-    Match("(");
-    Condition();
-    Match(")");
-    Statement();
-    if (currentLexeme() == "else") {
-        Match("else");
-        Statement();
-    }
-    Match("fi");
-}
-
-// <Return> ::= return ( <Expression> | ε ) ;
-void ReturnStmt() {
-    Match("return");
-    if (currentLexeme() != ";") Expression();
-    Match(";");
-}
-
-// <Print> ::= put ( <Expression> ) ;
 void PrintStmt() {
     Match("put");
     Match("(");
     Expression();
     Match(")");
     Match(";");
+    emit("STDOUT");
 }
 
-// <Scan> ::= get ( <IDs> ) ;
 void ScanStmt() {
     Match("get");
     Match("(");
-    IDs();
+    string id = currentLexeme();
+    Symbol s = getSymbol(id);
+    Match(id);
     Match(")");
     Match(";");
+    emit("STDIN");
+    emit("POPM " + to_string(s.memory));
 }
 
-// <While> ::= while ( <Condition> ) <Statement>
 void WhileStmt() {
     Match("while");
     Match("(");
+    int start = instrAddress;
+    emit("LABEL");
     Condition();
+    int jumpz = instrAddress;
+    emit("JUMPZ 0");
     Match(")");
     Statement();
+    emit("JUMP " + to_string(start));
+    assembly[jumpz - 1] = to_string(jumpz) + " JUMPZ " + to_string(instrAddress);
 }
 
-// <Condition> ::= <Expression> <Relop> <Expression>
 void Condition() {
     Expression();
+    string op = currentLexeme();
     Relop();
     Expression();
+
+    if (op == "<") emit("LES");
+    else if (op == ">") emit("GRT");
+    else if (op == "==") emit("EQU");
+    else if (op == "!=") emit("NEQ");
+    else if (op == "<=") emit("LEQ");
+    else if (op == ">=") emit("GEQ");
 }
 
-// <Relop> ::= == | != | > | < | <= | >=
 void Relop() {
-    if (isRelopLexeme(currentLexeme())) Match(currentLexeme());
-    else syntaxError("Expected relational operator (==, !=, >, <, <=, >=)");
+    if (isRelopLexeme(currentLexeme()))
+        Match(currentLexeme());
+    else syntaxError("Expected relational operator");
 }
 
-// <Expression> ::= <Term> <ExpressionPrime>
 void Expression() {
     Term();
     ExpressionPrime();
 }
 
-// <ExpressionPrime> ::= (+|-) <Term> <ExpressionPrime> | ε
 void ExpressionPrime() {
-    string lex = currentLexeme();
-    if (lex == "+" || lex == "-") {
-        Match(lex);
+    if (currentLexeme() == "+" || currentLexeme() == "-") {
+        string op = currentLexeme();
+        Match(op);
         Term();
+        if (op == "+") emit("ADD");
+        else emit("SUB");
         ExpressionPrime();
     }
 }
 
-// <Term> ::= <Factor> <TermPrime>
 void Term() {
     Factor();
     TermPrime();
 }
 
-// <TermPrime> ::= (*|/) <Factor> <TermPrime> | ε
 void TermPrime() {
-    string lex = currentLexeme();
-    if (lex == "*" || lex == "/") {
-        Match(lex);
+    if (currentLexeme() == "*" || currentLexeme() == "/") {
+        string op = currentLexeme();
+        Match(op);
         Factor();
+        if (op == "*") emit("MUL");
+        else emit("DIV");
         TermPrime();
     }
 }
 
-// <Factor> ::= - <Primary> | <Primary>
 void Factor() {
     if (currentLexeme() == "-") {
         Match("-");
         Primary();
+        emit("PUSHI -1");
+        emit("MUL");
     } else Primary();
 }
 
-// <Primary> ::= <Identifier> | <Integer> | (<Expression>) | true | false
 void Primary() {
     string lex = currentLexeme();
-    if (isIdentifierLexeme(lex) || isNumberLexeme(lex) || lex == "true" || lex == "false") {
+    if (isIdentifierLexeme(lex)) {
+        Symbol s = getSymbol(lex);
         Match(lex);
-    } else if (lex == "(") {
+        emit("PUSHM " + to_string(s.memory));
+    }
+    else if (isNumberLexeme(lex)) {
+        emit("PUSHI " + lex);
+        Match(lex);
+    }
+    else if (lex == "true") {
+        emit("PUSHI 1");
+        Match("true");
+    }
+    else if (lex == "false") {
+        emit("PUSHI 0");
+        Match("false");
+    }
+    else if (lex == "(") {
         Match("(");
         Expression();
         Match(")");
-    } else syntaxError("Unexpected primary");
+    }
+    else syntaxError("Invalid primary");
 }
 
-// ===== Main =====
+/* ================= MAIN ================= */
+
 int main() {
     ifstream myFile("Rat25f.txt");
     if (!myFile) {
@@ -774,7 +769,7 @@ int main() {
     myFile.close();
 
     Rat25F();
-
     return 0;
 }
+
 
