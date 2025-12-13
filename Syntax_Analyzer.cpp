@@ -51,7 +51,7 @@ string currentLexeme()
     return "";
 }
 
-int emitInstruction(const string &instr)
+int emitInstruction(const string &instr) //PushM add
 {
     instructions.push_back(to_string(instructionIndex) + " " + instr);
     return instructionIndex++;
@@ -300,15 +300,15 @@ void Statement()
     if (lex == "{")
         Compound();
     else if (lex == "if")
-        IfStmt();
+        IfStmt();  //1 
     else if (lex == "return")
         ReturnStmt();
     else if (lex == "put")
-        PrintStmt();
+        PrintStmt();//2
     else if (lex == "get")
-        ScanStmt();
+        ScanStmt();//3
     else if (lex == "while")
-        WhileStmt();
+        WhileStmt();//4
     else if (isIdentifierLexeme(lex))
         Assign();
     else
@@ -456,7 +456,7 @@ void TermPrime()
     if (lex == "*" || lex == "/")
     {
         Match(lex);
-        Factor();
+        Factor();     //-x * y                              
          if(lex == "*")
             emitInstruction("MUL");
         else
@@ -470,12 +470,13 @@ void TermPrime()
 // <Factor> ::= - <Primary> | <Primary>
 void Factor()
 {
-    if (currentLexeme() == "-")
+    if (currentLexeme() == "-")  // 
     {
         Match("-");
-        Primary();
+        Primary(); // x
         emitInstruction("PUSHI -1");
         emitInstruction("MUL");
+        //-x 
     }
     else
         Primary();
@@ -507,6 +508,8 @@ void Primary()
         else // Identifier
         {
             Match(lex);
+            //Symbol s = lookupSymbol(lex);
+            //
             // lookup lex here
             emitInstruction("PUSHM " + lex); // Put memory address of lex
         }
