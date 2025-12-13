@@ -1,0 +1,66 @@
+﻿Starting lexical analysis...
+<Rat25F> -> # <Opt Declaration List> <Statement List> #
+Token: #   (matched '#')
+<Opt Declaration List> -> <Declaration List>
+<Declaration List> -> <Declaration> ; (<Declaration> ;)*
+<Declaration> -> <Qualifier> <IDs>
+<Qualifier> -> integer | boolean
+Token: integer   (matched 'integer')
+<IDs> -> <Identifier> (, <Identifier>)*
+Token: i   (matched 'i')
+Token: ,   (matched ',')
+Token: max   (matched 'max')
+Token: ,   (matched ',')
+Token: sum   (matched 'sum')
+Token: ;   (matched ';')
+<Statement List> -> (<Statement>)*
+Token: sum   (matched 'sum')
+Token: =   (matched '=')
+Token: 0   (matched '0')
+Token: ;   (matched ';')
+Token: i   (matched 'i')
+Token: =   (matched '=')
+Token: 1   (matched '1')
+Token: ;   (matched ';')
+Token: get   (matched 'get')
+Token: (   (matched '(')
+<IDs> -> <Identifier> (, <Identifier>)*
+Token: max   (matched 'max')
+Token: )   (matched ')')
+Token: ;   (matched ';')
+Token: while   (matched 'while')
+Token: (   (matched '(')
+Token: i   (matched 'i')
+Token: <   (matched '<')
+Token: max   (matched 'max')
+Token: )   (matched ')')
+Token: {   (matched '{')
+<Statement List> -> (<Statement>)*
+Token: sum   (matched 'sum')
+Token: =   (matched '=')
+Token: sum   (matched 'sum')
+Token: +   (matched '+')
+Token: i   (matched 'i')
+Token: ;   (matched ';')
+Token: i   (matched 'i')
+Token: =   (matched '=')
+Token: i   (matched 'i')
+Token: +   (matched '+')
+Token: 1   (matched '1')
+Token: ;   (matched ';')
+Token: }   (matched '}')
+Token: put   (matched 'put')
+Token: (   (matched '(')
+Token: sum   (matched 'sum')
+Token: +   (matched '+')
+Token: max   (matched 'max')
+Token: )   (matched ')')
+Token: ;   (matched ';')
+Token: #   (matched '#')
+Parsing completed successfully.
+
+Symbol Table
+Identifier   MemoryLocation   Type
+i          10000          integer
+max          10001          integer
+sum          10002          integer

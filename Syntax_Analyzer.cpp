@@ -405,35 +405,34 @@ R29. <Empty> ::= ε
 */
 
 #include "Lexical_Analyzer.h"
+#include "Symbol_Table.h"
 #include <iostream>
 #include <fstream>
 #include <vector>
 #include <string>
 using namespace std;
 
+SymbolTable symtab;   // [A3 CHANGE] Global symbol table for Assignment 3
+
 int indexPos = 0;
 bool printSwitch = true; // toggle verbose printing
 
 // Function prototypes
 void Rat25F();
-void OptFunctionDefinitions();
-void FunctionDefinitions();
-void Function();
-void OptParameterList();
-void ParameterList();
-void Parameter();
-void Qualifier();
+string Qualifier();          // [A3 CHANGE] now returns declared type
 void Body();
 void OptDeclarationList();
 void DeclarationList();
 void Declaration();
-void IDs();
+
+// [A3 CHANGE] Split IDs into declaration vs usage
+void IDsDecl(const string& type); 
+void IDsUse();
+
 void StatementList();
 void Statement();
 void Compound();
 void Assign();
-void IfStmt();
-void ReturnStmt();
 void PrintStmt();
 void ScanStmt();
 void WhileStmt();
@@ -446,6 +445,7 @@ void TermPrime();
 void Factor();
 void Primary();
 
+
 // Helper functions
 string currentLexeme() {
     if (indexPos < (int)globalToken.lexeme.size()) return globalToken.lexeme[indexPos];
@@ -456,111 +456,64 @@ bool atEnd() {
     return indexPos >= (int)globalToken.lexeme.size();
 }
 
-// Skip comment lexemes ("comment")
-void SkipComments() {
-    while (!atEnd() && currentLexeme()[0] == '"') {
-        if (printSwitch) cout << "Skipping comment: " << currentLexeme() << endl;
-        indexPos++;
-    }
-}
-
 // Syntax error
 void syntaxError(const string &msg) {
     string lex = atEnd() ? "EOF" : currentLexeme();
-    cerr << "Syntax Error: " << msg << " at token '" << lex << "' (index " << indexPos << ")" << endl;
+    cerr << "Syntax Error: " << msg
+         << " at token '" << lex
+         << "' (index " << indexPos << ")" << endl;
     exit(1);
 }
 
 // Match a specific lexeme
 void Match(const string &expected) {
-    SkipComments();
     if (atEnd()) syntaxError("Expected '" + expected + "' but found EOF");
     string cur = currentLexeme();
     if (cur == expected) {
-        if (printSwitch) cout << "Token: " << cur << "   (matched '" << expected << "')" << endl;
+        if (printSwitch)
+            cout << "Token: " << cur << "   (matched '" << expected << "')" << endl;
         indexPos++;
-        SkipComments();
     } else syntaxError("Expected '" + expected + "' but found '" + cur + "'");
 }
 
 // ===== Grammar Rules =====
 
-// <Rat25F> ::= <Opt Function Definitions> # <Opt Declaration List> <Statement List> #
+// <Rat25F> ::= # <Opt Declaration List> <Statement List> #
+// [A3 CHANGE] Simplified Rat25F – no function definitions
 void Rat25F() {
-    if (printSwitch) cout << "<Rat25F> -> <Opt Function Definitions> # <Opt Declaration List> <Statement List> #" << endl;
+    if (printSwitch)
+        cout << "<Rat25F> -> # <Opt Declaration List> <Statement List> #" << endl;
 
-    OptFunctionDefinitions();
     Match("#");
     OptDeclarationList();
     StatementList();
     Match("#");
 
-    if (!atEnd()) {
-        cerr << "Warning: extra tokens remain starting at index " << indexPos << endl;
-    } else {
+    if (!atEnd())
+        cerr << "Warning: extra tokens remain starting at index "
+             << indexPos << endl;
+    else
         cout << "Parsing completed successfully." << endl;
-    }
-}
 
-// <Opt Function Definitions> ::= <Function Definitions> | ε
-void OptFunctionDefinitions() {
-    if (currentLexeme() == "function") {
-        if (printSwitch) cout << "<Opt Function Definitions> -> <Function Definitions>" << endl;
-        FunctionDefinitions();
-    } else if (printSwitch) cout << "<Opt Function Definitions> -> ε" << endl;
-}
-
-// <Function Definitions> ::= <Function> (<Function Definitions>)*
-void FunctionDefinitions() {
-    if (printSwitch) cout << "<Function Definitions> -> <Function> (<Function Definitions>)*" << endl;
-    Function();
-    while (currentLexeme() == "function") Function();
-}
-
-// <Function> ::= function <Identifier> ( <Opt Parameter List> ) <Opt Declaration List> <Body>
-void Function() {
-    if (printSwitch) cout << "<Function> -> function <Identifier> ( <Opt Parameter List> ) <Opt Declaration List> <Body>" << endl;
-    Match("function");
-    if (isIdentifierLexeme(currentLexeme())) Match(currentLexeme());
-    else syntaxError("Expected function name (identifier)");
-    Match("(");
-    OptParameterList();
-    Match(")");
-    OptDeclarationList();
-    Body();
-}
-
-// <Opt Parameter List> ::= <Parameter List> | ε
-void OptParameterList() {
-    if (isIdentifierLexeme(currentLexeme())) {
-        if (printSwitch) cout << "<Opt Parameter List> -> <Parameter List>" << endl;
-        ParameterList();
-    } else if (printSwitch) cout << "<Opt Parameter List> -> ε" << endl;
-}
-
-// <Parameter List> ::= <Parameter> (, <Parameter>)*
-void ParameterList() {
-    if (printSwitch) cout << "<Parameter List> -> <Parameter> (, <Parameter>)*" << endl;
-    Parameter();
-    while (currentLexeme() == ",") {
-        Match(",");
-        Parameter();
-    }
-}
-
-// <Parameter> ::= <IDs> <Qualifier>
-void Parameter() {
-    if (printSwitch) cout << "<Parameter> -> <IDs> <Qualifier>" << endl;
-    IDs();
-    Qualifier();
+    symtab.print();   // [A3 CHANGE] required symbol table listing
 }
 
 // <Qualifier> ::= integer | boolean | real
-void Qualifier() {
-    if (printSwitch) cout << "<Qualifier> -> integer | boolean | real" << endl;
+// [A3 CHANGE] real is NOT allowed in Assignment 3
+string Qualifier() {
+    if (printSwitch)
+        cout << "<Qualifier> -> integer | boolean" << endl;
+
     string lex = currentLexeme();
-    if (lex == "integer" || lex == "boolean" || lex == "real") Match(lex);
-    else syntaxError("Expected type qualifier (integer, boolean, or real)");
+    if (lex == "integer" || lex == "boolean") {
+        Match(lex);
+        return lex;
+    }
+    if (lex == "real")
+        syntaxError("Type 'real' is not allowed in Assignment 3");
+
+    syntaxError("Expected type qualifier (integer or boolean)");
+    return "";
 }
 
 // <Body> ::= { <Statement List> }
@@ -574,18 +527,23 @@ void Body() {
 // <Opt Declaration List> ::= <Declaration List> | ε
 void OptDeclarationList() {
     string lex = currentLexeme();
-    if (lex == "integer" || lex == "boolean" || lex == "real") {
-        if (printSwitch) cout << "<Opt Declaration List> -> <Declaration List>" << endl;
+    if (lex == "integer" || lex == "boolean") {
+        if (printSwitch)
+            cout << "<Opt Declaration List> -> <Declaration List>" << endl;
         DeclarationList();
-    } else if (printSwitch) cout << "<Opt Declaration List> -> ε" << endl;
+    } else if (printSwitch)
+        cout << "<Opt Declaration List> -> ε" << endl;
 }
 
-// <Declaration List> ::= <Declaration> ; (<Declaration> ;)*
+// <Declaration List> ::= <Declaration> ; (<Declaration> ; )*
 void DeclarationList() {
-    if (printSwitch) cout << "<Declaration List> -> <Declaration> ; (<Declaration> ;)*" << endl;
+    if (printSwitch)
+        cout << "<Declaration List> -> <Declaration> ; (<Declaration> ;)*" << endl;
+
     Declaration();
     Match(";");
-    while (currentLexeme() == "integer" || currentLexeme() == "boolean" || currentLexeme() == "real") {
+
+    while (currentLexeme() == "integer" || currentLexeme() == "boolean") {
         Declaration();
         Match(";");
     }
@@ -593,44 +551,82 @@ void DeclarationList() {
 
 // <Declaration> ::= <Qualifier> <IDs>
 void Declaration() {
-    if (printSwitch) cout << "<Declaration> -> <Qualifier> <IDs>" << endl;
-    Qualifier();
-    IDs();
+    if (printSwitch)
+        cout << "<Declaration> -> <Qualifier> <IDs>" << endl;
+
+    string type = Qualifier();   // [A3 CHANGE]
+    IDsDecl(type);               // [A3 CHANGE]
 }
 
 // <IDs> ::= <Identifier> (, <Identifier>)*
-void IDs() {
-    if (printSwitch) cout << "<IDs> -> <Identifier> (, <Identifier>)*" << endl;
-    if (isIdentifierLexeme(currentLexeme())) Match(currentLexeme());
-    else syntaxError("Expected identifier in <IDs>");
+// [A3 CHANGE] Declaration version: inserts into symbol table
+void IDsDecl(const string& type) {
+    if (printSwitch)
+        cout << "<IDs> -> <Identifier> (, <Identifier>)*" << endl;
+
+    string name = currentLexeme();
+    if (IdentifierFSM(name) != "identifier" || checkKeyword(name) == "keyword ")
+        syntaxError("Expected identifier in declaration");
+
+    symtab.insert(name, type);
+    Match(name);
+
     while (currentLexeme() == ",") {
         Match(",");
-        if (isIdentifierLexeme(currentLexeme())) Match(currentLexeme());
-        else syntaxError("Expected identifier after ',' in <IDs>");
+        name = currentLexeme();
+        if (IdentifierFSM(name) != "identifier" || checkKeyword(name) == "keyword ")
+            syntaxError("Expected identifier after ','");
+
+        symtab.insert(name, type);
+        Match(name);
+    }
+}
+
+// [A3 CHANGE] Usage version: lookup only (no insertion)
+void IDsUse() {
+    if (printSwitch)
+        cout << "<IDs> -> <Identifier> (, <Identifier>)*" << endl;
+
+    string name = currentLexeme();
+    if (IdentifierFSM(name) != "identifier" || checkKeyword(name) == "keyword ")
+        syntaxError("Expected identifier");
+
+    symtab.lookup(name);
+    Match(name);
+
+    while (currentLexeme() == ",") {
+        Match(",");
+        name = currentLexeme();
+        if (IdentifierFSM(name) != "identifier" || checkKeyword(name) == "keyword ")
+            syntaxError("Expected identifier after ','");
+
+        symtab.lookup(name);
+        Match(name);
     }
 }
 
 // <Statement List> ::= (<Statement>)*
 void StatementList() {
-    if (printSwitch) cout << "<Statement List> -> (<Statement>)*" << endl;
+    if (printSwitch)
+        cout << "<Statement List> -> (<Statement>)*" << endl;
+
     while (!atEnd()) {
         string lex = currentLexeme();
-        if (lex == "{" || isIdentifierLexeme(lex) || lex == "if" || lex == "return" || lex == "put" || lex == "get" || lex == "while") {
+        if (lex == "{" || IdentifierFSM(lex) == "identifier" ||
+            lex == "put" || lex == "get" || lex == "while")
             Statement();
-        } else break;
+        else break;
     }
 }
 
-// <Statement> ::= <Compound> | <Assign> | <If> | <Return> | <Print> | <Scan> | <While>
+// <Statement> ::= <Compound> | <Assign> | <Print> | <Scan> | <While>
 void Statement() {
     string lex = currentLexeme();
     if (lex == "{") Compound();
-    else if (lex == "if") IfStmt();
-    else if (lex == "return") ReturnStmt();
     else if (lex == "put") PrintStmt();
-    else if (lex == "get") ScanStmt();      
+    else if (lex == "get") ScanStmt();
     else if (lex == "while") WhileStmt();
-    else if (isIdentifierLexeme(lex)) Assign();
+    else if (IdentifierFSM(lex) == "identifier") Assign();
     else syntaxError("Unrecognized start of <Statement>");
 }
 
@@ -643,30 +639,12 @@ void Compound() {
 
 // <Assign> ::= <Identifier> = <Expression> ;
 void Assign() {
-    Match(currentLexeme());
+    string lhs = currentLexeme();
+    symtab.lookup(lhs);    // [A3 CHANGE] use-before-declare check
+    Match(lhs);
+
     Match("=");
     Expression();
-    Match(";");
-}
-
-// <If> ::= if ( <Condition> ) <Statement> ( else <Statement> )? fi
-void IfStmt() {
-    Match("if");
-    Match("(");
-    Condition();
-    Match(")");
-    Statement();
-    if (currentLexeme() == "else") {
-        Match("else");
-        Statement();
-    }
-    Match("fi");
-}
-
-// <Return> ::= return ( <Expression> | ε ) ;
-void ReturnStmt() {
-    Match("return");
-    if (currentLexeme() != ";") Expression();
     Match(";");
 }
 
@@ -683,7 +661,7 @@ void PrintStmt() {
 void ScanStmt() {
     Match("get");
     Match("(");
-    IDs();
+    IDsUse();              // [A3 CHANGE]
     Match(")");
     Match(";");
 }
@@ -707,7 +685,7 @@ void Condition() {
 // <Relop> ::= == | != | > | < | <= | >=
 void Relop() {
     if (isRelopLexeme(currentLexeme())) Match(currentLexeme());
-    else syntaxError("Expected relational operator (==, !=, >, <, <=, >=)");
+    else syntaxError("Expected relational operator");
 }
 
 // <Expression> ::= <Term> <ExpressionPrime>
@@ -753,18 +731,27 @@ void Factor() {
 // <Primary> ::= <Identifier> | <Integer> | (<Expression>) | true | false
 void Primary() {
     string lex = currentLexeme();
-    if (isIdentifierLexeme(lex) || isNumberLexeme(lex) || lex == "true" || lex == "false") {
+
+    if (IdentifierFSM(lex) == "identifier") {
+        symtab.lookup(lex);    // [A3 CHANGE]
         Match(lex);
-    } else if (lex == "(") {
+    }
+    else if (isNumberLexeme(lex) || lex == "true" || lex == "false") {
+        Match(lex);
+    }
+    else if (lex == "(") {
         Match("(");
         Expression();
         Match(")");
-    } else syntaxError("Unexpected primary");
+    }
+    else syntaxError("Unexpected primary");
 }
 
 // ===== Main =====
-int main() {
-    ifstream myFile("Rat25f.txt");
+int main(int argc, char** argv) {
+    string filename = (argc > 1) ? argv[1] : "Rat25f.txt";
+
+    ifstream myFile(filename);
     if (!myFile) {
         cerr << "Error opening input file" << endl;
         return 1;
@@ -774,7 +761,6 @@ int main() {
     myFile.close();
 
     Rat25F();
-
     return 0;
 }
 
