@@ -759,7 +759,7 @@ void Primary() {
 /* ================= MAIN ================= */
 
 int main() {
-    ifstream myFile("Rat25f.txt");
+    ifstream myFile("Rat25f3.txt");
     if (!myFile) {
         cerr << "Error opening input file" << endl;
         return 1;
