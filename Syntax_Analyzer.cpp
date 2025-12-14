@@ -27,29 +27,18 @@ int instrAddress = 1;
 
 
 
-vector<string> instructions;
-int instructionIndex = 0;
 
 // Function prototypes
 void Rat25F();
-void OptFunctionDefinitions();
-void FunctionDefinitions();
-void Function();
-void OptParameterList();
-void ParameterList();
-void Parameter();
-void Qualifier();
-void Body();
 void OptDeclarationList();
 void DeclarationList();
 void Declaration();
 void IDs();
 void StatementList();
 void Statement();
-void Compound();
 void Assign();
 void IfStmt();
-void ReturnStmt();
+void CompoundStmt();
 void PrintStmt();
 void ScanStmt();
 void WhileStmt();
@@ -72,8 +61,8 @@ string currentLexeme()
 
 int emitInstruction(const string &instr) //PushM add
 {
-    instructions.push_back(to_string(instructionIndex) + " " + instr);
-    return instructionIndex++;
+    assembly.push_back(to_string(instrAddress) + " " + instr);
+    return instrAddress++;
 }
 
 bool atEnd()
@@ -138,9 +127,6 @@ Symbol getSymbol(const string &id) {
     }
     return symbolTable[idx];
 }
-
-
-
 
 
 void Rat25F() {
@@ -246,7 +232,7 @@ void Assign() {
     Expression();
     //emitInstruction("POPM " + s.address);
     Match(";");
-    emit("POPM " + to_string(s.memory));
+    emitInstruction("POPM " + to_string(s.memory));
 }
 
 void PrintStmt() {
@@ -255,7 +241,7 @@ void PrintStmt() {
     Expression();
     Match(")");
     Match(";");
-    emit("STDOUT");
+    emitInstruction("STDOUT");
 }
 
 void ScanStmt() {
@@ -430,6 +416,12 @@ int main() {
         for (const string &s : assembly)
             outFile << s << endl;
 
+        outFile << "\nSymbol Table\n";
+        outFile << "Identifier\tMemory\tType\n";
+        for (size_t j = 0; j < symbolNames.size(); j++)
+            outFile << symbolNames[j] << "\t\t"
+                    << symbolTable[j].memory << "\t"
+                    << symbolTable[j].type << endl;
         outFile.close();
 
         cout << "Processed " << inputFiles[i] << " -> " << outputFiles[i] << endl;

@@ -89,3 +89,16 @@
 89 STDOUT
 90 PUSHM 10009
 91 STDOUT
+
+Symbol Table
+Identifier	Memory	Type
+n		10000	integer
+i		10001	integer
+factorial		10002	integer
+sum		10003	integer
+j		10004	integer
+product		10005	integer
+k		10006	integer
+square		10007	integer
+cube		10008	integer
+count		10009	integer

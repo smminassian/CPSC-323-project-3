@@ -22,3 +22,9 @@
 22 PUSHM 10001
 23 ADD
 24 STDOUT
+
+Symbol Table
+Identifier	Memory	Type
+i		10000	integer
+max		10001	integer
+sum		10002	integer
