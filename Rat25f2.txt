@@ -1,0 +1,22 @@
+"* this is a longer sample test case for assignment 3 "
+#
+integer n, i, factorial, sum, j, product; "declarations"
+factorial = 1;
+sum = 0;
+product = 1;
+i = 1;
+j = 1;
+get(n);
+while (i < n) {
+    factorial = factorial * i;
+    sum = sum + i;
+    i = i + 1;
+}
+while (j < n) {
+    product = product * j;
+    j = j + 1;
+}
+put(factorial);
+put(sum);
+put(product);
+#

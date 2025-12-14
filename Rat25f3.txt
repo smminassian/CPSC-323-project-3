@@ -1,0 +1,37 @@
+"* this is a 35-line sample test case for assignment 3 "
+#
+integer n, i, factorial, sum, j, product, k, square, cube, count; "declarations"
+factorial = 1;
+sum = 0;
+product = 1;
+i = 1;
+j = 1;
+k = 1;
+square = 0;
+cube = 0;
+count = 0;
+get(n);
+while (i < n) {
+    factorial = factorial * i;
+    sum = sum + i;
+    if (i == 5) {
+        count = count + 1;
+    }
+    i = i + 1;
+}
+while (j < n) {
+    product = product * j;
+    j = j + 1;
+}
+while (k <= n) {
+    square = k * k;
+    cube = k * k * k;
+    k = k + 1;
+}
+put(factorial);
+put(sum);
+put(product);
+put(square);
+put(cube);
+put(count);
+#
